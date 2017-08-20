@@ -5,6 +5,7 @@ from urllib2 import urlopen, URLError, HTTPError
 import time
 import json
 import copy
+import logging
 import rumps
 # from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -119,21 +120,31 @@ class Currency:
 
         return rVal
 
-# current table goes here
 
+# @rumps.clicked("Debugging")
+def OpenDebugWindow():
+    logging.info("should open debugging window")
+    rumps.Window(title="Debugging")
+    return
+
+# current table goes here
 coins = []
-newMenu = []
+new_menu = []
 def GetTopCoins():
     try:
+        logging.info("Downloading coins from %s" % GetCoinsUrl())
         output = urlopen(GetCoinsUrl()).read()
-
         jason = json.loads(output)
 
         del coins[:]
-        del newMenu [:]
+        del new_menu [:]
 
-        quitMenu = rumps.MenuItem("Quit", callback=rumps.quit_application)
-        newMenu.insert(len(newMenu), quitMenu)
+        quit_menu = rumps.MenuItem("Quit", callback=rumps.quit_application)
+        new_menu.insert(len(new_menu), quit_menu)
+
+        # debug_menu_window = rumps.MenuItem("Debugging", callback=OpenDebugWindow)
+        # new_menu.insert(len(new_menu), debug_menu_window)
+
 
         for c in jason:
             curr = Currency.CurrencyFromTable(c)
@@ -141,18 +152,18 @@ def GetTopCoins():
             curr.GetIconFile()
             coinMenu = rumps.MenuItem(
                 curr.GetSymbolAndUsd(), icon=curr.GetIconFile(), callback=curr.SetToMenuItem)
-            newMenu.insert(len(newMenu), coinMenu)
+            new_menu.insert(len(new_menu), coinMenu)
             if curr.id == default_coin:
                 curr.SetToMenuItem(None) # this is just setting the sender to None
 
         if pycoin is not None:
             pycoin.menu.clear()
-            pycoin.menu.update(newMenu)
+            pycoin.menu.update(new_menu)
 
     except HTTPError, e:
-        print "HTTP error loading coins:", e.code, coins_url
+        logging.error("HTTP error loading coins: %s %s" % e.code % coins_url)
     except URLError, e:
-        print "Error loading url:", e.reason, coins_url
+        logging.error("Error loading url: %s %s" % e.reason % coins_url)
 
 
 def CreateDataFoldersIfNecessary():
@@ -169,7 +180,9 @@ def LoadSettingsOrDefaults():
     if (application_support is None):
         return
 
+    logging.info("Loading settings")
     if not os.path.isfile(settings_file):
+        logging.info("Initializing default settings")
         data = {}
         data['defaultCoin'] = "bitcoin"
         data["fiatReference"] = "USD"
@@ -179,6 +192,7 @@ def LoadSettingsOrDefaults():
             json.dump(data, outfile)
 
     if os.path.isfile(settings_file):
+        logging.info("Reading settings")
         with open(settings_file) as json_file:
             data = json.load(json_file)
             global default_coin
@@ -195,6 +209,7 @@ def SaveSettings():
     if (application_support is None):
         return
 
+    logging.info("Saving settings")
     data = {}
 
     global default_coin
@@ -206,9 +221,12 @@ def SaveSettings():
     global coin_count
     data["coinCount"] = coin_count
 
+    logging.info("Writing settings")
     with open(settings_file, 'w') as outfile:
         json.dump(data, outfile)
 
+def Log(msg):
+    return
 
 def timez():
     return time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.localtime())
@@ -216,16 +234,23 @@ def timez():
 @rumps.timer(300)
 def GetCoinsTimerCallback(sender):
     # print('%r %r' % (sender, timez()))
+    logging.info("Get Top Coins timer")
     GetTopCoins()
 
 pycoin = None
 application_support = None
 logos_folder = "logos"
+
+log_file = "pycoin.log"
+
 if __name__ == "__main__":
     application_support = rumps.application_support("pycoin")
     logos_folder = application_support + "/" + logos_folder
 
     CreateDataFoldersIfNecessary()
+
+    logging.basicConfig(filename=application_support + "/" + log_file,
+                        level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 
     settings_file = application_support + "/settings.json"
     LoadSettingsOrDefaults()
