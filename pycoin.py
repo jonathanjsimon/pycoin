@@ -107,12 +107,6 @@ class Currency:
             rVal.percentChange7d = tbl["percent_change_7d"]
         if "last_updated" in tbl:
             rVal.lastUpdated = tbl["last_updated"]
-        if "price_eur" in tbl:
-            rVal.priceEur = tbl["price_eur"]
-        if "24h_volume_eur" in tbl:
-            rVal._24hVolumeEur = tbl["24h_volume_eur"]
-        if "market_cap_eur" in tbl:
-            rVal.marketCapEur = tbl["market_cap_eur"]
 
         return rVal
 
