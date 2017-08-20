@@ -252,6 +252,8 @@ if __name__ == "__main__":
     logging.basicConfig(filename=application_support + "/" + log_file,
                         level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 
+    logging.info("---APP START---")
+
     settings_file = application_support + "/settings.json"
     LoadSettingsOrDefaults()
 
