@@ -41,7 +41,7 @@ class Currency:
     def GetSymbolAndUsd(self):
         rVal = ""
         if self.priceUsd is not None:
-            rVal = self.priceUsd
+            rVal = "$" + self.priceUsd
 
         if self.symbol is not None:
             rVal = "(" + self.symbol + ") " + rVal
@@ -156,10 +156,10 @@ def GetTopCoins():
 
 
 def CreateDataFoldersIfNecessary():
-    if not os.path.exists(application_support):
+    if not os.path.isdir(application_support):
         os.makedirs(application_support)
 
-    if not os.path.exists(logos_folder):
+    if not os.path.isdir(logos_folder):
         os.makedirs(logos_folder)
 
     return
@@ -215,7 +215,7 @@ def timez():
 
 @rumps.timer(300)
 def GetCoinsTimerCallback(sender):
-    print('%r %r' % (sender, timez()))
+    # print('%r %r' % (sender, timez()))
     GetTopCoins()
 
 pycoin = None
