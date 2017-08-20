@@ -4,12 +4,17 @@ import os
 from urllib2 import urlopen, URLError, HTTPError
 import time
 import json
+import copy
 import rumps
-import pathlib2 as pathlib
-import objc
 # from concurrent.futures import ThreadPoolExecutor, as_completed
 
+default_coin = "bitcoin"
+fiat_reference = "USD"
+coin_count = "50"
 coins_url = 'https://api.coinmarketcap.com/v1/ticker/?convert=USD&limit=50'
+
+def GetCoinsUrl():
+    return "https://api.coinmarketcap.com/v1/ticker/?convert=" + fiat_reference + "&limit=" + coin_count
 
 class Currency:
     id = None
@@ -44,9 +49,13 @@ class Currency:
         return rVal
 
     def SetToMenuItem(self, sender):
-        if theApp is not None:
-            theApp.icon = self.GetIconFile()
-            theApp.title = self.GetSymbolAndUsd()
+        global default_coin
+        default_coin = copy.copy(self.id)
+        SaveSettings()
+
+        if pycoin is not None:
+            pycoin.icon = self.GetIconFile()
+            pycoin.title = self.GetSymbolAndUsd()
 
     def GetIconUrl(self):
         return "https://files.coinmarketcap.com/static/img/coins/64x64/" + self.id + ".png"
@@ -54,9 +63,9 @@ class Currency:
     def GetIconFile(self):
         # Open the url
         url = self.GetIconUrl()
-        target_file = theApplicationSupport + "/" + os.path.basename(url)
+        target_file = logos_folder + "/" + os.path.basename(url)
 
-        if pathlib.Path(target_file).is_file() is False:
+        if not os.path.isfile(target_file):
             try:
                 f = urlopen(url)
                 # print "downloading " + url
@@ -112,12 +121,11 @@ class Currency:
 
 # current table goes here
 
-menuItemCoin = "ethereum"
 coins = []
 newMenu = []
 def GetTopCoins():
     try:
-        output = urlopen(coins_url).read()
+        output = urlopen(GetCoinsUrl()).read()
 
         jason = json.loads(output)
 
@@ -127,8 +135,6 @@ def GetTopCoins():
         quitMenu = rumps.MenuItem("Quit", callback=rumps.quit_application)
         newMenu.insert(len(newMenu), quitMenu)
 
-        deafult_coin_name = ""
-        default_coin_price = ""
         for c in jason:
             curr = Currency.CurrencyFromTable(c)
             coins.insert(len(coins), curr)
@@ -136,36 +142,93 @@ def GetTopCoins():
             coinMenu = rumps.MenuItem(
                 curr.GetSymbolAndUsd(), icon=curr.GetIconFile(), callback=curr.SetToMenuItem)
             newMenu.insert(len(newMenu), coinMenu)
-            if curr.id == menuItemCoin:
+            if curr.id == default_coin:
                 curr.SetToMenuItem(None) # this is just setting the sender to None
-                defaultCoinName = curr.name
-                defaultCoinPrice = curr.priceUsd
 
-        if theApp is not None:
-            NSDictionary = objc.lookUpClass("NSDictionary")
-            theApp.menu.clear()
-            theApp.menu.update(newMenu)
-            rumps.notification("PyCoin Update", deafult_coin_name,
-                            default_coin_price, sound=False, data=NSDictionary())
+        if pycoin is not None:
+            pycoin.menu.clear()
+            pycoin.menu.update(newMenu)
+
     except HTTPError, e:
         print "HTTP error loading coins:", e.code, coins_url
     except URLError, e:
         print "Error loading url:", e.reason, coins_url
+
+
+def CreateDataFoldersIfNecessary():
+    if not os.path.exists(application_support):
+        os.makedirs(application_support)
+
+    if not os.path.exists(logos_folder):
+        os.makedirs(logos_folder)
+
+    return
+
+settings_file = ""
+def LoadSettingsOrDefaults():
+    if (application_support is None):
+        return
+
+    if not os.path.isfile(settings_file):
+        data = {}
+        data['defaultCoin'] = "bitcoin"
+        data["fiatReference"] = "USD"
+        data["coinCount"] = "50"
+
+        with open(settings_file, 'w') as outfile:
+            json.dump(data, outfile)
+
+    if os.path.isfile(settings_file):
+        with open(settings_file) as json_file:
+            data = json.load(json_file)
+            global default_coin
+            default_coin = data["defaultCoin"]
+
+            global fiat_reference
+            fiat_reference = data["fiatReference"]
+
+            global coin_count
+            coin_count = data["coinCount"]
+    return
+
+def SaveSettings():
+    if (application_support is None):
+        return
+
+    data = {}
+
+    global default_coin
+    data["defaultCoin"] = default_coin
+
+    global fiat_reference
+    data["fiatReference"] = fiat_reference
+
+    global coin_count
+    data["coinCount"] = coin_count
+
+    with open(settings_file, 'w') as outfile:
+        json.dump(data, outfile)
+
 
 def timez():
     return time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.localtime())
 
 @rumps.timer(300)
 def GetCoinsTimerCallback(sender):
-    # print('%r %r' % (sender, timez()))
+    print('%r %r' % (sender, timez()))
     GetTopCoins()
 
-theApp = None
-theApplicationSupport = None
+pycoin = None
+application_support = None
+logos_folder = "logos"
 if __name__ == "__main__":
-    theApplicationSupport = rumps.application_support("pycoin")
-    # GetTopCoins()
+    application_support = rumps.application_support("pycoin")
+    logos_folder = application_support + "/" + logos_folder
 
-    theApp = rumps.App("PyCoin", title="PyCoin")
+    CreateDataFoldersIfNecessary()
 
-    theApp.run()
+    settings_file = application_support + "/settings.json"
+    LoadSettingsOrDefaults()
+
+    pycoin = rumps.App("PyCoin", title="PyCoin")
+    pycoin.run()

@@ -7,7 +7,7 @@ OPTIONS = {
     'plist': {
         'LSUIElement': True,
     },
-    'packages': ['rumps', 'pathlib2'],
+    'packages': ['rumps'],
 }
 
 setup(
