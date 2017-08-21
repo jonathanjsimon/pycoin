@@ -6,6 +6,7 @@ import time
 import json
 import copy
 import logging
+import threading
 import rumps
 # from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -32,6 +33,9 @@ class Currency:
     percentChange24h = None
     percentChange7d = None
     lastUpdated = None
+
+    logoDownloadThread = None
+    logoDownloadSemaphore = threading.Semaphore(1)
 
     def GetNameWithSymbol(self):
         rVal = self.name
@@ -62,29 +66,15 @@ class Currency:
         return "https://files.coinmarketcap.com/static/img/coins/64x64/" + self.id + ".png"
 
     def GetIconFile(self):
-        # Open the url
-        url = self.GetIconUrl()
-        target_file = logos_folder + "/" + os.path.basename(url)
+        target_file = logos_folder + "/" + os.path.basename(self.GetIconUrl())
 
-        if not os.path.isfile(target_file):
-            logging.info("Downloading icon for %s from %s", self.name, url)
-            try:
-                f = urlopen(url)
-                # print "downloading " + url
-
-                # Open our local file for writing
-                with open(target_file, "wb") as local_file:
-                    local_file.write(f.read())
-
-            #handle errors
-            except HTTPError, e:
-                logging.error("HTTP Error: %s %s", e.code, url)
-            except URLError, e:
-                logging.error("URL Error: %s %s", e.reason, url)
+        # if self.logoDownloadThread is None or self.logoDownloadThread.isAlive() is False:
+        #     self.logoDownloadThread = threading.Thread(target=LogoDownloadWorker, args=(self,))
+        #     # self.logoDownloadThread.setDaemon(True)
+        #     self.logoDownloadThread.start()
+        #     # self.logoDownloadThread.join(timeout=1)
 
         return target_file
-
-
 
     @staticmethod
     def CurrencyFromTable(tbl):
@@ -121,6 +111,39 @@ class Currency:
 
         return rVal
 
+threads = []
+coins_for_logo_download = []
+logoDownloadThread = None
+def LogoDownloadWorker(coin):
+    # time.sleep(1)
+    if coin is None:
+        return
+
+    coin_logo_url = coin.GetIconUrl()
+    # logging.info(coin_logo_url)
+    target_file = logos_folder + "/" + os.path.basename(coin_logo_url)
+
+    with coin.logoDownloadSemaphore:
+        if not os.path.isfile(target_file):
+            logging.info("Downloading icon for %s from %s",
+                        coin.id, coin_logo_url)
+            try:
+                f = urlopen(coin_logo_url)
+                logging.debug("Opened url for %s", coin_logo_url)
+                # print "downloading " + url
+
+                # Open our local file for writing
+                with open(target_file, "wb") as local_file:
+                    logging.debug("Opened local file for %s", target_file)
+                    local_file.write(f.read())
+                    logging.debug("Wrote local logo file for %s", target_file)
+
+            #handle errors
+            except HTTPError, e:
+                logging.error("HTTP Error: %s %s", e.code, coin_logo_url)
+            except URLError, e:
+                logging.error("URL Error: %s %s", e.reason, coin_logo_url)
+    return
 
 # @rumps.clicked("Debugging")
 def OpenDebugWindow():
@@ -146,16 +169,17 @@ def GetTopCoins():
         # debug_menu_window = rumps.MenuItem("Debugging", callback=OpenDebugWindow)
         # new_menu.insert(len(new_menu), debug_menu_window)
 
-
         for c in jason:
-            curr = Currency.CurrencyFromTable(c)
-            coins.insert(len(coins), curr)
-            curr.GetIconFile()
+            coin = Currency.CurrencyFromTable(c)
+            coins.insert(len(coins), coin)
+            LogoDownloadWorker(coin)
+
+        for coin in coins:
             coinMenu = rumps.MenuItem(
-                curr.GetSymbolAndUsd(), icon=curr.GetIconFile(), callback=curr.SetToMenuItem)
+                coin.GetSymbolAndUsd(), icon=coin.GetIconFile(), callback=coin.SetToMenuItem)
             new_menu.insert(len(new_menu), coinMenu)
-            if curr.id == default_coin:
-                curr.SetToMenuItem(None) # this is just setting the sender to None
+            if coin.id == default_coin: # this is just setting the sender to None
+                coin.SetToMenuItem(None)
 
         if pycoin is not None:
             pycoin.menu.clear()
@@ -251,7 +275,7 @@ if __name__ == "__main__":
     CreateDataFoldersIfNecessary()
 
     logging.basicConfig(filename=application_support + "/" + log_file,
-                        level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
+                        level=logging.DEBUG, format='%(asctime)s [%(levelname)s] [%(threadName)-10s] %(message)s')
 
     logging.info("---APP START---")
 
