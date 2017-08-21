@@ -67,6 +67,7 @@ class Currency:
         target_file = logos_folder + "/" + os.path.basename(url)
 
         if not os.path.isfile(target_file):
+            logging.info("Downloading icon for %s from %s", self.name, url)
             try:
                 f = urlopen(url)
                 # print "downloading " + url
@@ -77,9 +78,9 @@ class Currency:
 
             #handle errors
             except HTTPError, e:
-                print "HTTP Error:", e.code, url
+                logging.error("HTTP Error: %s %s", e.code, url)
             except URLError, e:
-                print "URL Error:", e.reason, url
+                logging.error("URL Error: %s %s", e.reason, url)
 
         return target_file
 
@@ -132,7 +133,7 @@ coins = []
 new_menu = []
 def GetTopCoins():
     try:
-        logging.info("Downloading coins from %s" % GetCoinsUrl())
+        logging.info("Downloading coins from %s", GetCoinsUrl())
         output = urlopen(GetCoinsUrl()).read()
         jason = json.loads(output)
 
@@ -161,9 +162,9 @@ def GetTopCoins():
             pycoin.menu.update(new_menu)
 
     except HTTPError, e:
-        logging.error("HTTP error loading coins: %s %s" % e.code % coins_url)
+        logging.error("HTTP error loading coins: %s %s", e.code, coins_url)
     except URLError, e:
-        logging.error("Error loading url: %s %s" % e.reason % coins_url)
+        logging.error("Error loading url: %s %s", e.reason, coins_url)
 
 
 def CreateDataFoldersIfNecessary():
