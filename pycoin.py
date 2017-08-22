@@ -163,7 +163,6 @@ def OpenDebugWindow():
     rumps.Window(title="Debugging")
     return
 
-
 coin_update_thread = None
 def StartCoinUpdateThread():
     global coin_update_thread
@@ -171,7 +170,6 @@ def StartCoinUpdateThread():
         coin_update_thread = threading.Thread(target=GetTopCoinsLooper)
         coin_update_thread.setDaemon(True)
         coin_update_thread.start()
-
 
 def GetTopCoinsLooper():
     while True:
@@ -181,8 +179,10 @@ def GetTopCoinsLooper():
 # current table goes here
 my_coins = []
 coins = []
+last_updated_time = ""
 def GetTopCoins():
     global coins
+    global last_updated_time
 
     try:
         logging.info("Downloading coins from %s", GetCoinsUrl())
@@ -198,6 +198,7 @@ def GetTopCoins():
                 coins.insert(len(coins), coin)
                 LogoDownloadWorker(coin)
 
+            last_updated_time = TimeStringForNow()
             ProcessCoinsToMenu()
 
     except HTTPError, e:
@@ -222,6 +223,10 @@ def ProcessCoinsToMenu():
 
     quit_menu = rumps.MenuItem("Quit", callback=rumps.quit_application)
     app_menu.insert(len(app_menu), quit_menu)
+
+    last_updated = rumps.MenuItem("Updated: " + last_updated_time)
+    app_menu.insert(len(app_menu), last_updated)
+
     app_menu.insert(len(app_menu), None)
 
     for coin in coins:
@@ -259,8 +264,6 @@ def ProcessCoinsToMenu():
     if pycoin is not None:
         pycoin.menu.clear()
         pycoin.menu.update(app_menu + my_coins_menu + all_coins_menu)
-
-
 
 def CreateDataFoldersIfNecessary():
     if not os.path.isdir(application_support):
@@ -331,13 +334,8 @@ def SaveSettings():
 def Log(msg):
     return
 
-def timez():
-    return time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.localtime())
-
-# @rumps.timer(300)
-# def GetCoinsTimerCallback(sender):
-#     logging.info("Get Top Coins timer")
-#     GetTopCoins()
+def TimeStringForNow():
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
 
 pycoin = None
 application_support = None
@@ -360,7 +358,6 @@ if __name__ == "__main__":
                         level=logging.DEBUG, format='%(asctime)s [%(levelname)s] [%(threadName)-10s] %(message)s')
 
     logging.info("---APP START---")
-    # logging.info(requests.certs.where())
 
     settings_file = application_support + "/settings.json"
     LoadSettingsOrDefaults()
