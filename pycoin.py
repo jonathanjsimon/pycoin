@@ -7,6 +7,8 @@ import json
 import copy
 import logging
 import threading
+import requests
+import sys
 import rumps
 # from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -120,7 +122,6 @@ def LogoDownloadWorker(coin):
         return
 
     coin_logo_url = coin.GetIconUrl()
-    # logging.info(coin_logo_url)
     target_file = logos_folder + "/" + os.path.basename(coin_logo_url)
 
     with coin.logoDownloadSemaphore:
@@ -128,15 +129,12 @@ def LogoDownloadWorker(coin):
             logging.info("Downloading icon for %s from %s",
                         coin.id, coin_logo_url)
             try:
-                f = urlopen(coin_logo_url)
-                logging.debug("Opened url for %s", coin_logo_url)
-                # print "downloading " + url
+                r = s.get(coin_logo_url)
 
-                # Open our local file for writing
-                with open(target_file, "wb") as local_file:
-                    logging.debug("Opened local file for %s", target_file)
-                    local_file.write(f.read())
-                    logging.debug("Wrote local logo file for %s", target_file)
+                if r.status_code == 200:
+                    with open(target_file, "wb") as local_file:
+                        for chunk in r.iter_content(chunk_size=128):
+                            local_file.write(chunk)
 
             #handle errors
             except HTTPError, e:
@@ -157,33 +155,35 @@ new_menu = []
 def GetTopCoins():
     try:
         logging.info("Downloading coins from %s", GetCoinsUrl())
-        output = urlopen(GetCoinsUrl()).read()
-        jason = json.loads(output)
+        r = s.get(GetCoinsUrl())
 
-        del coins[:]
-        del new_menu [:]
+        if r.status_code == 200:
+            jason = r.json()
 
-        quit_menu = rumps.MenuItem("Quit", callback=rumps.quit_application)
-        new_menu.insert(len(new_menu), quit_menu)
+            del coins[:]
+            del new_menu [:]
 
-        # debug_menu_window = rumps.MenuItem("Debugging", callback=OpenDebugWindow)
-        # new_menu.insert(len(new_menu), debug_menu_window)
+            quit_menu = rumps.MenuItem("Quit", callback=rumps.quit_application)
+            new_menu.insert(len(new_menu), quit_menu)
 
-        for c in jason:
-            coin = Currency.CurrencyFromTable(c)
-            coins.insert(len(coins), coin)
-            LogoDownloadWorker(coin)
+            # debug_menu_window = rumps.MenuItem("Debugging", callback=OpenDebugWindow)
+            # new_menu.insert(len(new_menu), debug_menu_window)
 
-        for coin in coins:
-            coinMenu = rumps.MenuItem(
-                coin.GetSymbolAndUsd(), icon=coin.GetIconFile(), callback=coin.SetToMenuItem)
-            new_menu.insert(len(new_menu), coinMenu)
-            if coin.id == default_coin: # this is just setting the sender to None
-                coin.SetToMenuItem(None)
+            for c in jason:
+                coin = Currency.CurrencyFromTable(c)
+                coins.insert(len(coins), coin)
+                LogoDownloadWorker(coin)
 
-        if pycoin is not None:
-            pycoin.menu.clear()
-            pycoin.menu.update(new_menu)
+            for coin in coins:
+                coinMenu = rumps.MenuItem(
+                    coin.GetSymbolAndUsd(), icon=coin.GetIconFile(), callback=coin.SetToMenuItem)
+                new_menu.insert(len(new_menu), coinMenu)
+                if coin.id == default_coin: # this is just setting the sender to None
+                    coin.SetToMenuItem(None)
+
+            if pycoin is not None:
+                pycoin.menu.clear()
+                pycoin.menu.update(new_menu)
 
     except HTTPError, e:
         logging.error("HTTP error loading coins: %s %s", e.code, coins_url)
@@ -265,8 +265,13 @@ def GetCoinsTimerCallback(sender):
 pycoin = None
 application_support = None
 logos_folder = "logos"
-
 log_file = "pycoin.log"
+
+is_py2app = hasattr(sys, "frozen")
+pem_path = "lib/python2.7/certifi/cacert.pem" if is_py2app else None
+
+s = requests.Session()
+s.verify = pem_path
 
 if __name__ == "__main__":
     application_support = rumps.application_support("pycoin")
@@ -278,6 +283,7 @@ if __name__ == "__main__":
                         level=logging.DEBUG, format='%(asctime)s [%(levelname)s] [%(threadName)-10s] %(message)s')
 
     logging.info("---APP START---")
+    # logging.info(requests.certs.where())
 
     settings_file = application_support + "/settings.json"
     LoadSettingsOrDefaults()
