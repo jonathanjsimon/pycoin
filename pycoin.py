@@ -149,6 +149,21 @@ def OpenDebugWindow():
     rumps.Window(title="Debugging")
     return
 
+
+coin_update_thread = None
+def StartCoinUpdateThread():
+    global coin_update_thread
+    if (coin_update_thread is None or coin_update_thread.IsAlive() is False):
+        coin_update_thread = threading.Thread(target=GetTopCoinsLooper)
+        coin_update_thread.setDaemon(True)
+        coin_update_thread.start()
+
+
+def GetTopCoinsLooper():
+    while True:
+        GetTopCoins()
+        time.sleep(300)
+
 # current table goes here
 coins = []
 new_menu = []
@@ -256,11 +271,10 @@ def Log(msg):
 def timez():
     return time.strftime("%a, %d %b %Y %H:%M:%S +0000", time.localtime())
 
-@rumps.timer(300)
-def GetCoinsTimerCallback(sender):
-    # print('%r %r' % (sender, timez()))
-    logging.info("Get Top Coins timer")
-    GetTopCoins()
+# @rumps.timer(300)
+# def GetCoinsTimerCallback(sender):
+#     logging.info("Get Top Coins timer")
+#     GetTopCoins()
 
 pycoin = None
 application_support = None
@@ -287,6 +301,7 @@ if __name__ == "__main__":
 
     settings_file = application_support + "/settings.json"
     LoadSettingsOrDefaults()
+    StartCoinUpdateThread()
 
     pycoin = rumps.App("PyCoin", title="PyCoin")
     pycoin.run()
