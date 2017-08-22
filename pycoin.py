@@ -165,45 +165,86 @@ def GetTopCoinsLooper():
         time.sleep(300)
 
 # current table goes here
+my_coins = []
 coins = []
-new_menu = []
 def GetTopCoins():
+    global coins
+
     try:
         logging.info("Downloading coins from %s", GetCoinsUrl())
-        r = s.get(GetCoinsUrl())
+        r = s.get(GetCoinsUrl(), timeout=(2, 5))
 
         if r.status_code == 200:
             jason = r.json()
 
             del coins[:]
-            del new_menu [:]
-
-            quit_menu = rumps.MenuItem("Quit", callback=rumps.quit_application)
-            new_menu.insert(len(new_menu), quit_menu)
-
-            # debug_menu_window = rumps.MenuItem("Debugging", callback=OpenDebugWindow)
-            # new_menu.insert(len(new_menu), debug_menu_window)
 
             for c in jason:
                 coin = Currency.CurrencyFromTable(c)
                 coins.insert(len(coins), coin)
                 LogoDownloadWorker(coin)
 
-            for coin in coins:
-                coinMenu = rumps.MenuItem(
-                    coin.GetSymbolAndUsd(), icon=coin.GetIconFile(), callback=coin.SetToMenuItem)
-                new_menu.insert(len(new_menu), coinMenu)
-                if coin.id == default_coin: # this is just setting the sender to None
-                    coin.SetToMenuItem(None)
-
-            if pycoin is not None:
-                pycoin.menu.clear()
-                pycoin.menu.update(new_menu)
+            ProcessCoinsToMenu()
 
     except HTTPError, e:
         logging.error("HTTP error loading coins: %s %s", e.code, coins_url)
     except URLError, e:
         logging.error("Error loading url: %s %s", e.reason, coins_url)
+    except requests.ConnectionError, e:
+        logging.error("Error connecting to url: %s %s", e.reason, coins_url)
+    except requests.ConnectTimeout, e:
+        logging.error("Connection to url timed out: %s %s", e.reason, coins_url)
+    except requests.ReadTimeout, e:
+        logging.error("Reading from url timed out: %s %s", e.reason, coins_url)
+
+def ProcessCoinsToMenu():
+    global my_coins
+    global coins
+
+    new_menu = []
+    app_menu = []
+    my_coins_menu = []
+    all_coins_menu = []
+
+    quit_menu = rumps.MenuItem("Quit", callback=rumps.quit_application)
+    app_menu.insert(len(app_menu), quit_menu)
+    app_menu.insert(len(app_menu), None)
+
+    for coin in coins:
+        my_coin_toggle = None
+        if not coin.id in my_coins:
+            my_coin_toggle = rumps.MenuItem("Add to my coins")
+        else:
+            my_coin_toggle = rumps.MenuItem("Remove from my coins")
+
+        main_coin_select = None
+        if coin.id == default_coin:  # this is just setting the sender to None
+            coin.SetToMenuItem(None)
+        else:
+            main_coin_select = rumps.MenuItem(
+                "Set as main coin", callback=coin.SetToMenuItem)
+
+        this_coin_submenu = [my_coin_toggle]
+        if main_coin_select is not None:
+            this_coin_submenu.append(main_coin_select)
+
+        # this_coin_submenu = []
+
+        coin_menu_item = [rumps.MenuItem(
+            coin.GetSymbolAndUsd(), icon=coin.GetIconFile(), callback=coin.SetToMenuItem), this_coin_submenu]
+
+        if not coin.id in my_coins:
+            all_coins_menu.insert(len(all_coins_menu), coin_menu_item)
+        else:
+            my_coins_menu.insert(len(my_coins_menu), coin_menu_item)
+
+        if len(my_coins_menu) > 0:
+            my_coins_menu.insert(len(my_coins_menu), None)
+
+    if pycoin is not None:
+        pycoin.menu.clear()
+        pycoin.menu.update(app_menu + my_coins_menu + all_coins_menu)
+
 
 
 def CreateDataFoldersIfNecessary():
@@ -227,6 +268,7 @@ def LoadSettingsOrDefaults():
         data['defaultCoin'] = "bitcoin"
         data["fiatReference"] = "USD"
         data["coinCount"] = "50"
+        data["myCoins"] = []
 
         with open(settings_file, 'w') as outfile:
             json.dump(data, outfile)
@@ -243,6 +285,9 @@ def LoadSettingsOrDefaults():
 
             global coin_count
             coin_count = data["coinCount"]
+
+            global my_coins
+            my_coins = data["myCoins"]
     return
 
 def SaveSettings():
@@ -260,6 +305,9 @@ def SaveSettings():
 
     global coin_count
     data["coinCount"] = coin_count
+
+    global my_coins
+    data["myCoins"] = my_coins
 
     logging.info("Writing settings")
     with open(settings_file, 'w') as outfile:
