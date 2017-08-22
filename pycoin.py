@@ -55,6 +55,17 @@ class Currency:
 
         return rVal
 
+    def ToggleMyCoinsMembership(self, sender):
+        global my_coins
+        if not self.id in my_coins:
+            my_coins.append(self.id)
+        else:
+            del my_coins[my_coins.index(self.id)]
+
+        SaveSettings()
+        ProcessCoinsToMenu()
+
+
     def SetToMenuItem(self, sender):
         global default_coin
         default_coin = copy.copy(self.id)
@@ -63,6 +74,9 @@ class Currency:
         if pycoin is not None:
             pycoin.icon = self.GetIconFile()
             pycoin.title = self.GetSymbolAndUsd()
+
+            if sender is not None:
+                ProcessCoinsToMenu();
 
     def GetIconUrl(self):
         return "https://files.coinmarketcap.com/static/img/coins/64x64/" + self.id + ".png"
@@ -217,6 +231,8 @@ def ProcessCoinsToMenu():
         else:
             my_coin_toggle = rumps.MenuItem("Remove from my coins")
 
+        my_coin_toggle.set_callback(coin.ToggleMyCoinsMembership)
+
         main_coin_select = None
         if coin.id == default_coin:  # this is just setting the sender to None
             coin.SetToMenuItem(None)
@@ -230,16 +246,15 @@ def ProcessCoinsToMenu():
 
         # this_coin_submenu = []
 
-        coin_menu_item = [rumps.MenuItem(
-            coin.GetSymbolAndUsd(), icon=coin.GetIconFile(), callback=coin.SetToMenuItem), this_coin_submenu]
+        coin_menu_item = [rumps.MenuItem(coin.GetSymbolAndUsd(), icon=coin.GetIconFile(), callback=coin.SetToMenuItem), this_coin_submenu]
 
         if not coin.id in my_coins:
             all_coins_menu.insert(len(all_coins_menu), coin_menu_item)
         else:
             my_coins_menu.insert(len(my_coins_menu), coin_menu_item)
 
-        if len(my_coins_menu) > 0:
-            my_coins_menu.insert(len(my_coins_menu), None)
+    if len(my_coins_menu) > 0:
+        my_coins_menu.insert(len(my_coins_menu), None)
 
     if pycoin is not None:
         pycoin.menu.clear()
