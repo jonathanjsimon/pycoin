@@ -232,7 +232,7 @@ coin_update_event = threading.Event()
 def GetTopCoinsLooper():
     global coin_update_event
 
-    while coin_update_event.wait(timeout=300):
+    while coin_update_event.wait(timeout=300) or True:
         coin_update_event.clear()
         GetTopCoins()
         # time.sleep(300)
