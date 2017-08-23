@@ -8,6 +8,7 @@ import logging
 import threading
 import requests
 import sys
+import webbrowser
 import rumps
 
 class Currency:
@@ -121,6 +122,10 @@ class Currency:
             details.insert(len(details), rumps.MenuItem(u"7d \u0394: " + self.percentChange7d + "%"))
 
         return details
+
+    def OpenCoinPage(self, sender):
+        webbrowser.open("https://coinmarketcap.com/currencies/" + self.id + "/")
+        return
 
     @staticmethod
     def CurrencyFromTable(tbl):
@@ -321,6 +326,7 @@ def ProcessCoinsToMenu():
             main_coin_select = rumps.MenuItem("Set as main coin", callback=coin.SetToMenuItem)
 
         this_coin_submenu = [my_coin_toggle]
+        this_coin_submenu.append(rumps.MenuItem("View on Coinmarketcap.com", callback=coin.OpenCoinPage))
         if main_coin_select is not None:
             this_coin_submenu.insert(0, main_coin_select)
 
