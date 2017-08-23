@@ -11,8 +11,8 @@ OPTIONS = {
         'CFBundleDisplayName': APP_NAME,
         'CFBundleGetInfoString': "Monitor cryptos",
         'CFBundleIdentifier': "com.simon.osx.pycoin",
-        'CFBundleVersion': "0.1.1",
-        'CFBundleShortVersionString': "0.1.1",
+        'CFBundleVersion': "0.5.0",
+        'CFBundleShortVersionString': "0.5.0",
         'NSHumanReadableCopyright': u"Copyright \u00A9 2017, Jonathan Simon, All Rights Reserved"
     },
     'packages': ['rumps', 'requests', 'certifi'],
