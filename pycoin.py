@@ -210,10 +210,10 @@ def GetJsonResponseForUrl(url):
 def AddMissingCoinToCoins(coinId):
     global coins
 
-    logging.info("%s missing from main list, must retrieve", default_coin)
-    coin_json = GetJsonResponseForUrl(GetSpecificCoinUrl(default_coin))
+    logging.info("%s missing from main list, must retrieve", coinId)
+    coin_json = GetJsonResponseForUrl(GetSpecificCoinUrl(coinId))
     if not coin_json is None and not "error" in coin_json:
-        logging.debug("Retrieved %s", default_coin)
+        logging.debug("Retrieved %s", coinId)
         true_coin = coin_json[0]
         if not true_coin is None:
             curr = Currency.CurrencyFromTable(true_coin)
