@@ -326,7 +326,7 @@ def ProcessCoinsToMenu():
             main_coin_select = rumps.MenuItem("Set as main coin", callback=coin.SetToMenuItem)
 
         this_coin_submenu = [my_coin_toggle]
-        this_coin_submenu.append(rumps.MenuItem("View on Coinmarketcap.com", callback=coin.OpenCoinPage))
+        this_coin_submenu.append(rumps.MenuItem("View on coinmarketcap.com", callback=coin.OpenCoinPage))
         if main_coin_select is not None:
             this_coin_submenu.insert(0, main_coin_select)
 
