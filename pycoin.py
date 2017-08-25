@@ -4,12 +4,16 @@ import os
 import time
 import json
 import copy
-import logging, logging.handlers
+import logging
+import logging.handlers
 import threading
-import requests
 import sys
 import webbrowser
+
 import rumps
+import requests
+from watchdog.observers import Observer
+from watchdog.events import PatternMatchingEventHandler, FileSystemEventHandler
 
 class Currency:
     id = None
@@ -444,9 +448,29 @@ def SaveSettings():
 
     logger.info("Writing settings")
     with open(settings_file, 'w') as outfile:
-        json.dump(data, outfile)
+        json.dump(data, outfile, indent=4)
 
-def Log(msg):
+observer = None
+def StartSettingsMonitor():
+    global observer
+    global application_support
+    global settings_file
+
+    logger.info(application_support)
+    logger.info(settings_file)
+
+    # event_handler = PatternMatchingEventHandler(patterns=settings_file, ignore_directories=True, case_sensitive=True)
+    # event_handler.on_any_event = SettingsMonitorEventHandler
+
+    event_handler = FileSystemEventHandler()
+    event_handler.on_any_event = SettingsMonitorEventHandler
+
+    observer = Observer()
+    observer.schedule(event_handler, application_support, recursive=False)
+    observer.start()
+
+def SettingsMonitorEventHandler(event):
+    logger.info("Settings Change detected")
     return
 
 def TimeStringForNow():
@@ -489,6 +513,11 @@ if __name__ == "__main__":
 
     StartCoinUpdateThread()
     coin_update_event.set()
+
+    # try:
+    #     StartSettingsMonitor()
+    # except:
+    #     logger.error("Error configuring settings monitor", exc_info=True)
 
     pycoin = rumps.App("PyCoin", title="PyCoin")
     pycoin.run()
