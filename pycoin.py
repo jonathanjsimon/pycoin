@@ -249,7 +249,7 @@ coin_update_thread = None
 def StartCoinUpdateThread():
     global coin_update_thread
     if (coin_update_thread is None or coin_update_thread.IsAlive() is False):
-        coin_update_thread = threading.Thread(target=GetTopCoinsLooper)
+        coin_update_thread = threading.Thread(target=GetTopCoinsLooper, name="CoinUpdater")
         coin_update_thread.start()
 
 coin_update_event = threading.Event()
