@@ -4,7 +4,7 @@ import os
 import time
 import json
 import copy
-import logging
+import logging, logging.handlers
 import threading
 import requests
 import sys
@@ -72,7 +72,11 @@ class Currency:
         return "https://files.coinmarketcap.com/static/img/coins/64x64/" + self.id + ".png"
 
     def GetIconFilePath(self):
-        return logos_folder + "/" + self.id + ".png"
+        target_logo = logos_folder + "/" + self.id + ".png"
+        if os.path.isfile(target_logo):
+            return target_logo
+
+        return None
 
     def DownloadCoinIcon(self):
         coin_logo_url = self.GetIconUrl()
@@ -80,9 +84,9 @@ class Currency:
 
         with self.logoDownloadSemaphore:
             if not os.path.isfile(target_file):
-                logging.info("Downloading icon for %s from %s", self.id, coin_logo_url)
+                logger.info("Downloading icon for %s from %s", self.id, coin_logo_url)
                 try:
-                    r = s.get(coin_logo_url, timeout=(2, 5))
+                    r = s.get(coin_logo_url, timeout=(2, 3))
 
                     if r.status_code == requests.codes.ok:
                         with open(target_file, "wb") as local_file:
@@ -90,36 +94,37 @@ class Currency:
                                 local_file.write(chunk)
 
                 except requests.ConnectionError, e:
-                    logging.error("Error connecting to url: %s", coin_logo_url)
+                    logger.error("Error connecting to url", exc_info=True)
                 except requests.ConnectTimeout, e:
-                    logging.error(
-                        "Connection to url timed out: %s ", coin_logo_url)
+                    logger.error("Connection to url timed out", exc_info=True)
                 except requests.ReadTimeout, e:
-                    logging.error("Reading from url timed out: %s", coin_logo_url)
+                    logger.error("Reading from url timed out", exc_info=True)
+                except:
+                    logger.error("Error processing response", exc_info=True)
 
     def GetCoinDetailsAsMenuItems(self):
         details = []
 
         if not self.name is None:
-            details.insert(len(details), rumps.MenuItem("Name: " + self.name))
+            details.append(rumps.MenuItem("Name: " + self.name))
         if not self.rank is None:
-            details.insert(len(details), rumps.MenuItem("Rank: " + self.rank))
+            details.append(rumps.MenuItem("Rank: " + self.rank))
         if not self.priceBtc is None:
-            details.insert(len(details), rumps.MenuItem(u"BTC: \u20BF" + self.priceBtc))
+            details.append(rumps.MenuItem(u"BTC: \u20BF" + self.priceBtc))
         if not self._24hVolumeUsd is None:
-            details.insert(len(details), rumps.MenuItem("24hr Volume: " + self._24hVolumeUsd))
+            details.append(rumps.MenuItem("24hr Volume: " + self._24hVolumeUsd))
         if not self.marketCapUsd is None:
-            details.insert(len(details), rumps.MenuItem("Market Cap USD: $" + self.marketCapUsd))
+            details.append(rumps.MenuItem("Market Cap USD: $" + self.marketCapUsd))
         if not self.availableSupply is None:
-            details.insert(len(details), rumps.MenuItem("Available: " + self.availableSupply))
+            details.append(rumps.MenuItem("Available: " + self.availableSupply))
         if not self.totalSupply is None:
-            details.insert(len(details), rumps.MenuItem("Total: " + self.totalSupply))
+            details.append(rumps.MenuItem("Total: " + self.totalSupply))
         if not self.percentChange1h is None:
-            details.insert(len(details), rumps.MenuItem(u"1h \u0394: " + self.percentChange1h + "%"))
+            details.append(rumps.MenuItem(u"1h \u0394: " + self.percentChange1h + "%"))
         if not self.percentChange24h is None:
-            details.insert(len(details), rumps.MenuItem(u"24h \u0394: " + self.percentChange24h + "%"))
+            details.append(rumps.MenuItem(u"24h \u0394: " + self.percentChange24h + "%"))
         if not self.percentChange7d is None:
-            details.insert(len(details), rumps.MenuItem(u"7d \u0394: " + self.percentChange7d + "%"))
+            details.append(rumps.MenuItem(u"7d \u0394: " + self.percentChange7d + "%"))
 
         return details
 
@@ -162,12 +167,21 @@ class Currency:
 
         return rVal
 
+def UpdateCoinsNow(sender):
+     coin_update_event.set()
 
-# @rumps.clicked("Debugging")
+def Quit(sender):
+    global should_run_coin_loop
+
+    should_run_coin_loop = False
+    coin_update_event.set()
+    coin_update_thread.join()
+    rumps.quit_application()
+
 debug_window = None
 def OpenDebugWindow(sender):
     global debug_window
-    logging.info("should open debugging window")
+    logger.info("should open debugging window")
     debug_window = rumps.Window(message="Foo", title="Debugging", default_text='Bar', dimensions=(320, 160))
     debug_window.run()
     return
@@ -181,7 +195,7 @@ def SetCoinCount(sender):
     global coin_count
     global coin_update_event
 
-    logging.debug("Setting coin count to %s", str(sender.title))
+    logger.info("Setting coin count to %s", str(sender.title))
     new_coin_count = int(sender.title)
     if not new_coin_count is None:
         coin_count = new_coin_count
@@ -199,26 +213,28 @@ def GetSpecificCoinUrl(coinId):
 def GetJsonResponseForUrl(url):
     rVal = None
     try:
-        r = s.get(url, timeout=(2, 5))
+        r = s.get(url, timeout=(2, 3))
 
         if r.status_code == requests.codes.ok:
             rVal = r.json()
     except requests.ConnectionError, e:
-        logging.error("Error connecting to url: %s", url)
+        logger.error("Error connecting to url", exc_info=True)
     except requests.ConnectTimeout, e:
-        logging.error("Connection to url timed out: %s ", url)
+        logger.error("Connection to url timed out", exc_info=True)
     except requests.ReadTimeout, e:
-        logging.error("Reading from url timed out: %s", url)
+        logger.error("Reading from url timed out", exc_info=True)
+    except:
+        logger.error("Error processing response", exc_info=True)
 
     return rVal
 
 def AddMissingCoinToCoins(coinId):
     global coins
 
-    logging.info("%s missing from main list, must retrieve", coinId)
+    logger.info("%s missing from main list, must retrieve", coinId)
     coin_json = GetJsonResponseForUrl(GetSpecificCoinUrl(coinId))
     if not coin_json is None and not "error" in coin_json:
-        logging.debug("Retrieved %s", coinId)
+        logger.debug("Retrieved %s", coinId)
         true_coin = coin_json[0]
         if not true_coin is None:
             curr = Currency.CurrencyFromTable(true_coin)
@@ -230,17 +246,23 @@ def StartCoinUpdateThread():
     global coin_update_thread
     if (coin_update_thread is None or coin_update_thread.IsAlive() is False):
         coin_update_thread = threading.Thread(target=GetTopCoinsLooper)
-        coin_update_thread.setDaemon(True)
         coin_update_thread.start()
 
 coin_update_event = threading.Event()
+should_run_coin_loop = True
 def GetTopCoinsLooper():
     global coin_update_event
+    global should_run_coin_loop
 
     while coin_update_event.wait(timeout=300) or True:
-        coin_update_event.clear()
-        GetTopCoins()
-        # time.sleep(300)
+        if (should_run_coin_loop):
+            coin_update_event.clear()
+            try:
+                GetTopCoins()
+            except:
+                logger.error("Error in coins loop", exc_info=True)
+        else:
+            break
 
 # current table goes here
 my_coins = []
@@ -250,7 +272,7 @@ def GetTopCoins():
     global coins
     global last_updated_time
 
-    logging.info("Downloading coins from %s", GetCoinsUrl())
+    logger.info("Downloading coins from %s", GetCoinsUrl())
     coins_json = GetJsonResponseForUrl(GetCoinsUrl())
 
     if not coins_json is None:
@@ -258,8 +280,11 @@ def GetTopCoins():
 
         for c in coins_json:
             coin = Currency.CurrencyFromTable(c)
-            coins.insert(len(coins), coin)
-            coin.DownloadCoinIcon()
+            coins.append(coin)
+            try:
+                coin.DownloadCoinIcon()
+            except:
+                logger.warn("Failed to download icon for %s", coin.id)
 
         last_updated_time = TimeStringForNow()
         ProcessCoinsToMenu()
@@ -276,7 +301,7 @@ def ProcessCoinsToMenu():
     all_coins_menu = []
 
     last_updated = rumps.MenuItem("Updated: " + last_updated_time)
-    app_menu.insert(len(app_menu), last_updated)
+    app_menu.append(last_updated)
 
     coin_count_options = []
     for count in [10, 25, 50, 100]:
@@ -290,15 +315,18 @@ def ProcessCoinsToMenu():
         coin_count_options.append(new_coin_count_option)
 
     coin_count_menu = [rumps.MenuItem("Coin Count"), coin_count_options]
-    app_menu.insert(len(app_menu), coin_count_menu)
+    app_menu.append(coin_count_menu)
+
+    force_refresh = rumps.MenuItem("Refresh", callback=UpdateCoinsNow)
+    app_menu.append(force_refresh)
 
     # debug_menu_window = rumps.MenuItem("Debugging", callback=OpenDebugWindow)
-    # app_menu.insert(len(app_menu), debug_menu_window)
+    # app_menu.append(debug_menu_window)
 
-    quit_menu = rumps.MenuItem("Quit", callback=rumps.quit_application)
-    app_menu.insert(len(app_menu), quit_menu)
+    quit_menu = rumps.MenuItem("Quit", callback=Quit)
+    app_menu.append(quit_menu)
 
-    app_menu.insert(len(app_menu), None)
+    app_menu.append(None)
 
     result = None
     for coin in my_coins:
@@ -322,6 +350,8 @@ def ProcessCoinsToMenu():
         main_coin_select = None
         if coin.id == default_coin:
             coin.SetToMenuItem(None)  # this is just setting the sender to None
+            main_coin_details = coin.GetCoinDetailsAsMenuItems()
+            app_menu[1:1] = main_coin_details
         else:
             main_coin_select = rumps.MenuItem("Set as main coin", callback=coin.SetToMenuItem)
 
@@ -332,18 +362,16 @@ def ProcessCoinsToMenu():
 
         this_coin_submenu = this_coin_submenu + coin.GetCoinDetailsAsMenuItems()
 
-        # this_coin_submenu = []
-
         coin_menu_item = [rumps.MenuItem(coin.GetSymbolAndUsd(), icon=coin.GetIconFilePath(), callback=coin.SetToMenuItem), this_coin_submenu]
 
         if not coin.id in my_coins:
-            all_coins_menu.insert(len(all_coins_menu), coin_menu_item)
+            all_coins_menu.append(coin_menu_item)
         else:
-            my_coins_menu.insert(len(my_coins_menu), coin_menu_item)
+            my_coins_menu.append(coin_menu_item)
 
     if len(my_coins_menu) > 0:
         my_coins_menu.insert(0, rumps.MenuItem("My Coins"))
-        my_coins_menu.insert(len(my_coins_menu), None)
+        my_coins_menu.append(None)
 
     if pycoin is not None:
         pycoin.menu.clear()
@@ -363,9 +391,9 @@ def LoadSettingsOrDefaults():
     if (application_support is None):
         return
 
-    logging.info("Loading settings")
+    logger.info("Loading settings")
     if not os.path.isfile(settings_file):
-        logging.info("Initializing default settings")
+        logger.info("Initializing default settings")
         data = {}
         data['defaultCoin'] = "bitcoin"
         data["fiatReference"] = "USD"
@@ -376,7 +404,7 @@ def LoadSettingsOrDefaults():
             json.dump(data, outfile)
 
     if os.path.isfile(settings_file):
-        logging.info("Reading settings")
+        logger.info("Reading settings")
         with open(settings_file) as json_file:
             data = json.load(json_file)
             global default_coin
@@ -401,7 +429,7 @@ def SaveSettings():
     if (application_support is None):
         return
 
-    logging.info("Saving settings")
+    logger.info("Saving settings")
     data = {}
 
     global default_coin
@@ -414,7 +442,7 @@ def SaveSettings():
     data["coinCount"] = coin_count
     data["myCoins"] = my_coins
 
-    logging.info("Writing settings")
+    logger.info("Writing settings")
     with open(settings_file, 'w') as outfile:
         json.dump(data, outfile)
 
@@ -428,6 +456,7 @@ pycoin = None
 application_support = None
 logos_folder = "logos"
 log_file = "pycoin.log"
+logger = None
 
 is_py2app = hasattr(sys, "frozen")
 pem_path = "lib/python2.7/certifi/cacert.pem" if is_py2app else None
@@ -441,10 +470,19 @@ if __name__ == "__main__":
 
     CreateDataFoldersIfNecessary()
 
-    logging.basicConfig(filename=application_support + "/" + log_file,
-                        level=logging.DEBUG, format='%(asctime)s [%(levelname)s] [%(threadName)-10s] %(message)s')
+    logger = logging.getLogger("PyCoin")
+    logger.setLevel(logging.DEBUG)
 
-    logging.info("---APP START---")
+    handler = logging.handlers.RotatingFileHandler(application_support + "/" + log_file, maxBytes=102400, backupCount=5)
+    handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] [%(threadName)-10s] %(message)s'))
+
+    logger.addHandler(handler)
+
+    httpLogger = logging.getLogger("urllib3")
+    httpLogger.setLevel(logging.WARNING)
+    httpLogger.addHandler(handler)
+
+    logger.info("---APP START---")
 
     settings_file = application_support + "/settings.json"
     LoadSettingsOrDefaults()
