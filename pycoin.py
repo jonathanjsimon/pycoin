@@ -172,10 +172,13 @@ class Currency:
         return rVal
 
 def UpdateCoinsNow(sender):
-     coin_update_event.set()
+    global coin_update_event
+    coin_update_event.set()
 
 def Quit(sender):
     global should_run_coin_loop
+    global coin_update_event
+    global coin_update_thread
 
     should_run_coin_loop = False
     coin_update_event.set()
@@ -190,6 +193,8 @@ def OpenDebugWindow(sender):
     debug_window.run()
     return
 
+possible_fiat_reference = ["AUD", "BRL", "CAD", "CHF", "CNY", "EUR", "GBP", "HKD", "IDR", "INR", "JPY", "KRW", "MXN", "RUB", "USD"]
+possible_coin_counts = [10, 25, 50, 100]
 
 default_coin = "bitcoin"
 fiat_reference = "USD"
@@ -311,6 +316,7 @@ def ProcessCoinsToMenu():
     global my_coins
     global coins
     global coin_count
+    global possible_fiat_reference
 
     new_menu = []
     app_menu = []
@@ -321,7 +327,7 @@ def ProcessCoinsToMenu():
     app_menu.append(last_updated)
 
     coin_count_options = []
-    for count in [10, 25, 50, 100]:
+    for count in possible_coin_counts:
         count_selected = 0
         if count == coin_count:
             count_selected = 1
@@ -395,52 +401,56 @@ def ProcessCoinsToMenu():
         pycoin.menu.update(app_menu + my_coins_menu + all_coins_menu)
 
 def CreateDataFoldersIfNecessary():
-    if not os.path.isdir(application_support):
-        os.makedirs(application_support)
+    try:
+        if not os.path.isdir(application_support):
+            os.makedirs(application_support)
 
-    if not os.path.isdir(logos_folder):
-        os.makedirs(logos_folder)
-
-    return
+        if not os.path.isdir(logos_folder):
+            os.makedirs(logos_folder)
+    except:
+        # This is bad since we can't even log it
+        pass
 
 settings_file = ""
 def LoadSettingsOrDefaults():
     if (application_support is None):
+        # this is bad since we can't log to a file in a folder that doesn't exist
         return
 
-    logger.info("Loading settings")
-    if not os.path.isfile(settings_file):
-        logger.info("Initializing default settings")
-        data = {}
-        data['defaultCoin'] = "bitcoin"
-        data["fiatReference"] = "USD"
-        data["coinCount"] = 25
-        data["myCoins"] = []
+    try:
+        if not os.path.isfile(settings_file):
+            logger.info("Initializing default settings")
+            data = {}
+            data['defaultCoin'] = "bitcoin"
+            data["fiatReference"] = "USD"
+            data["coinCount"] = 25
+            data["myCoins"] = []
 
-        with open(settings_file, 'w') as outfile:
-            json.dump(data, outfile)
+            with open(settings_file, 'w') as outfile:
+                json.dump(data, outfile)
 
-    if os.path.isfile(settings_file):
-        logger.info("Reading settings")
-        with open(settings_file) as json_file:
-            data = json.load(json_file)
-            global default_coin
-            global fiat_reference
-            global coin_count
-            global my_coins
+        if os.path.isfile(settings_file):
+            logger.info("Reading settings")
+            with open(settings_file) as json_file:
+                data = json.load(json_file)
+                global default_coin
+                global fiat_reference
+                global coin_count
+                global my_coins
 
-            if "defaultCoin" in data:
-                default_coin = data["defaultCoin"]
+                if "defaultCoin" in data:
+                    default_coin = data["defaultCoin"]
 
-            if "fiatReference" in data:
-                fiat_reference = data["fiatReference"]
+                if "fiatReference" in data:
+                    fiat_reference = data["fiatReference"]
 
-            if "coinCount" in data:
-                coin_count = int(data["coinCount"])
+                if "coinCount" in data:
+                    coin_count = int(data["coinCount"])
 
-            if "myCoins" in data:
-                my_coins = data["myCoins"]
-    return
+                if "myCoins" in data:
+                    my_coins = data["myCoins"]
+    except:
+        logger.error("Error loading settings", exc_info=True)
 
 def SaveSettings():
     if (application_support is None):
@@ -459,9 +469,11 @@ def SaveSettings():
     data["coinCount"] = coin_count
     data["myCoins"] = my_coins
 
-    logger.info("Writing settings")
-    with open(settings_file, 'w') as outfile:
-        json.dump(data, outfile, indent=4)
+    try:
+        with open(settings_file, 'w') as outfile:
+            json.dump(data, outfile, indent=4)
+    except:
+        logger.error("Error saving settings", exc_info=True)
 
 observer = None
 def StartSettingsMonitor():
