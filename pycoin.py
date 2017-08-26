@@ -252,19 +252,29 @@ def StartCoinUpdateThread():
         coin_update_thread = threading.Thread(target=GetTopCoinsLooper, name="CoinUpdater")
         coin_update_thread.start()
 
+coin_update_timeout = 300
 coin_update_event = threading.Event()
 should_run_coin_loop = True
 def GetTopCoinsLooper():
+    global coin_update_timeout
     global coin_update_event
     global should_run_coin_loop
 
-    while coin_update_event.wait(timeout=300) or True:
+    while coin_update_event.wait(timeout=coin_update_timeout) or True:
         if (should_run_coin_loop):
             coin_update_event.clear()
+            did_get_coins = False
+
             try:
-                GetTopCoins()
+                did_get_coins = GetTopCoins()
             except:
                 logger.error("Error in coins loop", exc_info=True)
+
+            if not did_get_coins:
+                coin_update_timeout = 60
+                logger.warn("Will retry getting coins in 60 seconds...")
+            else:
+                coin_update_timeout = 300
         else:
             break
 
@@ -292,6 +302,9 @@ def GetTopCoins():
 
         last_updated_time = TimeStringForNow()
         ProcessCoinsToMenu()
+        return True
+
+    return False
 
 
 def ProcessCoinsToMenu():
