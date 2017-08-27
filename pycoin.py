@@ -185,6 +185,16 @@ def Quit(sender):
     coin_update_thread.join()
     rumps.quit_application()
 
+def OpenHomePage(sender):
+    webbrowser.open("http://www.github.com/jonathanjsimon/pycoin")
+
+about_window = None
+def ShowAboutWindow(sender):
+    global about_window
+    logger.info("Opening about window...")
+    about_window = rumps.Window(message="About", title="About PyCoin")
+    about_window.run()
+
 debug_window = None
 def OpenDebugWindow(sender):
     global debug_window
@@ -342,6 +352,14 @@ def ProcessCoinsToMenu():
 
     force_refresh = rumps.MenuItem("Refresh", callback=UpdateCoinsNow)
     app_menu.append(force_refresh)
+
+    about_sub_menu = [
+        rumps.MenuItem("Homepage", callback=OpenHomePage),
+        rumps.MenuItem("v0.5.4")
+    ]
+
+    about_menu = [rumps.MenuItem("About"), about_sub_menu]
+    app_menu.append(about_menu)
 
     # debug_menu_window = rumps.MenuItem("Debugging", callback=OpenDebugWindow)
     # app_menu.append(debug_menu_window)
