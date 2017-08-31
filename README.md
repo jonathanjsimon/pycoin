@@ -14,6 +14,6 @@ A macOS menu bar app that monitors cryptos on [coinmarketcap.com](https://coinma
  - Be able to set which fiat currency to use as reference
 
 ## Shameless request for donations
-If you'd like to send a donation, please send BTC to `1Cuf6ZtPPG4RwDvtiwr5sTdVBjZEp2sKFh`. Not necessary but very much appreciated.
+If you'd like to send a donation, please send BTC to `34FLk4rA4MwhXpJhdUbY91HVn2CYY97BFq`. Not necessary but very much appreciated.
 
 ![](https://raw.githubusercontent.com/jonathanjsimon/pycoin/master/PyCoin.png)
